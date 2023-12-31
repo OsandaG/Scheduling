@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+    <table class="table table-striped">
+        <tr>
+        {% for obj in object_list.0.keys %}
+            <th>{{obj}} </th>
+         {% endfor %}
+        </tr>
+        {% for object in object_list %}
+            <tr>
+                {% for val in object.values %}
+                    <td>{{val|safe}} </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+
+{% endblock %}
