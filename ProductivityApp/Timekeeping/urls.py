@@ -1,14 +1,18 @@
 from django.urls import path
 
-how from . import views
+from . import views
 
 urlpatterns = [
-    path("", views.TaskListView.as_view(), name="Home"),
+    path("", views.HomeView.as_view(), name="Home"),
     path("ListTask", views.TaskListView.as_view(), name="List Tasks"),
-    path("ListTimeEntry", views.TaskListView.as_view(), name="List Time Entries"),
+    path("ListTimeEntry", views.TimeEntryListView.as_view(), name="List Time Entries"),
     path("UpdateTask/<int:pk>/", views.TaskUpdateView.as_view() , name="Update Task"),
     path("UpdateTimeEntry/<int:pk>/", views.TimeEntryUpdateView.as_view() , name="Update Time Entry"),
+    path("DeleteTask/<int:pk>/", views.TaskDeleteView.as_view(), name="Delete Task"),
+    path("DeleteTimeEntry/<int:pk>/", views.TimeEntryDeleteView.as_view(), name="Delete Time Entry"),
     path("CreateTask", views.TaskCreateView.as_view(), name="Create Task"),
     path("CreateTimeEntry", views.TimeEntryCreateView.as_view(), name="Create Time Entry"),
-    path("action/<action>/<id>", views.Actions.as_view(), name="my-view"),
+    path("action/<action>/<id>", views.Actions.as_view(), name="actions"),
+    path("reset", views.reset, name="reset"),
+
 ]

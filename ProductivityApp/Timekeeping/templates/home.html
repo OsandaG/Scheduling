@@ -1,26 +1,40 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
-<table>
-  <tr>
-    <th>Company</th>
-    <th>Contact</th>
-    <th>Country</th>
-  </tr>
-  <tr>
-    <td>Alfreds Futterkiste</td>
-    <td>Maria Anders</td>
-    <td>Germany</td>
-  </tr>
-  <tr>
-    <td>Centro comercial Moctezuma</td>
-    <td>Francisco Chang</td>
-    <td>Mexico</td>
-  </tr>
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row">
+<form method="get" action="">
+    {{ filter_form }}
+    <button type="submit"  class="btn btn-primary">Apply Filter</button>
+</form>
+</div>
+<table class="table table-striped">
+    <tr>
+        {% for obj in object_list.0.keys %}
+         {% if "Utility_" not in obj %}
+        <th>{{obj}}</th>
+        {% endif %}
+        {% endfor %}
+    </tr>
+    {% for object in object_list %}
+    <tr class = "{{ object.Utility_Priority }}">
+        {% for key,val in object.items %}
+        {% if "Utility_" not in key %}
+        <td>{{val|safe}}</td>
+        {% endif %}
+        {% endfor %}
+    </tr>
+
+     {% if "Utility_Progress" not in key%}
+    <tr>
+        <td colspan="7">
+            <div class="progress" role="progressbar" aria-label="Basic example" aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
+                 aria-valuemax="100">
+                <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%</div>
+            </div>
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
 </table>
-</body>
-</html>
+
+{% endblock %}
