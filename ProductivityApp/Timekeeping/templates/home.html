@@ -1,12 +1,30 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="row">
-<form method="get" action="">
-    {{ filter_form }}
-    <button type="submit"  class="btn btn-primary">Apply Filter</button>
+
+<form method="get" class="row row-cols-lg-auto g-3 align-items-center" action="">
+  {% csrf_token %}
+
+  {% for field in filter_form %}
+    <div class="form-group">
+      <label class="col-sm-2 col-form-label">{{ field.label_tag }}</label>
+      {{ field }}
+      {% if field.help_text %}
+        <small class="form-text text-muted">{{ field.help_text }}</small>
+      {% endif %}
+      {% if field.errors %}
+        <div class="text-danger">
+          {% for error in field.errors %}
+            {{ error }}
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <button type="submit" class="btn btn-primary">Submit</button>
 </form>
-</div>
+
 <table class="table table-striped">
     <tr>
         {% for obj in object_list.0.keys %}

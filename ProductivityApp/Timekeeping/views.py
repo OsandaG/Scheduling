@@ -45,7 +45,11 @@ class HomeView(ViewMixIn, ListView):
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
         context = super().get_context_data(**kwargs)
-        context['filter_form'] = DateForm()
+        initial_show_date = self.request.GET.get('show_date',None)
+        if not initial_show_date:
+            initial_show_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
+
+        context['filter_form'] = DateForm(initial={'show_date': initial_show_date})
         return context
 
     def get_filtered_tasks(self):
