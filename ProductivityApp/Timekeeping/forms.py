@@ -1,5 +1,5 @@
 from django import forms
-from django.forms.widgets import DateInput, TimeInput, Select
+from django.forms.widgets import DateInput, TimeInput, Select, TextInput
 from datetime import datetime
 from .models import Task, TimeEntry  # Import your model
 
@@ -42,16 +42,18 @@ class DateForm(forms.Form):
     # Define your form fields for filtering here
     show_date = forms.DateField(
         label='Show Date',
-        widget=DateInput(attrs={'type': 'date'}),  # Use the DateInput widget
+        widget=DateInput(attrs={'type': 'date', 'class':'form-control'}),  # Use the DateInput widget
         required=False  # Add this if the field is optional
     )
 
 
 class QuickCreate(forms.Form):
-    name = forms.CharField(required=False)
-    proposed_time = forms.TimeField(widget=TimeInput(attrs={'type': 'time'}), required=False,
+    name = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    proposed_start = forms.TimeField(widget=TimeInput(attrs={'type': 'time', 'class':'form-control'}), required=False,
                                     initial=datetime.strftime(datetime.now(), '%H:%M'))
-    assign_time = forms.TimeField(widget=TimeInput(attrs={'type': 'time'}), required=False, initial='00:20')
+    assigned_time = forms.TimeField(widget=TimeInput(attrs={'type': 'time', 'class':'form-control'}), required=False, initial='00:20',
+                                  )
     choices = (('Urgent', 'Urgent'), ('Normal', 'Normal'), ('Low', 'Low'))
-    priority_choice = forms.ChoiceField(choices=choices, required=False, initial='Normal')
-    notes = forms.CharField(required=False)
+    priority_choice = forms.ChoiceField(choices=choices, required=False, initial='Normal',
+                                        widget=forms.Select(attrs={'class': 'form-select'}))
+    notes = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))

@@ -1,65 +1,85 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
+<div class="container-fluid">
+    <div class="d-flex flex-row mb-3">
+      <div class="p-2">
+          <a class="btn btn-primary" role="button" href="{{go_prev_day}}">
+            <i class="bi bi-arrow-left-circle"></i></a>
+      </div>
+      <div class="p-2">
+          <a class="btn btn-primary" role="button" href="{{go_to_today}}">
+            <i class="bi bi-arrow-down-circle"></i></a>
+      </div>
+      <div class="p-2">
+          <form method="get" action="" class="row">
 
-<form method="get" class="row mx-auto p-2" action="">
-    {% csrf_token %}
-    <div class="input-group">
-    <span class="input-group-text">Date</span>
-    {{ filter_form.show_date }}
-    {% if filter_form.show_date.errors %}
-    <div class="text-danger">
-        {% for error in filter_form.show_date.errors %}
-        {{ error }}
-        {% endfor %}
+            <div class="col">
+                {{ filter_form.show_date }}
+                {% if filter_form.show_date.errors %}
+                <div class="text-danger">
+                    {% for error in filter_form.show_date.errors %}
+                    {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+              <div class="col">
+                <button type="submit" class="btn btn-primary">Go To</button>
+            </div>
+        </form>
+      </div>
+      <div class="p-2">
+          <a class="btn btn-primary" role="button" href="{{go_next_day}}">
+            <i class="bi bi-arrow-right-circle"></i></a>
+      </div>
     </div>
-    {% endif %}
-    <button type="submit" class="btn btn-primary">Submit</button>
 </div>
-</form>
 
-<table class="table table-striped">
-    <tr>
-        {% for obj in object_list.0.keys %}
-        {% if "Utility_" not in obj %}
-        <th>{{obj}}</th>
-        {% endif %}
-        {% endfor %}
-    </tr>
+<div class="container-fluid">
     {% for object in object_list %}
-    <tr class="{{ object.Utility_Priority }}">
-        {% for key,val in object.items %}
-        {% if "Utility_" not in key %}
-        <td>{{val|safe}}</td>
-        {% endif %}
-        {% endfor %}
-    </tr>
+    <div class="border border-3 {{ object.Utility_Priority }} p-1">
+        <div class="row">
+            {% for key,val in object.items %}
+            {% if "Utility_" not in key %}
+            <div class="col d-flex mx-auto p-2">
+                {% if key in 'Proposed Time_Assigned Time_Used Time' %}
+                <span class="d-flex align-items-center p-1 pe-2 text-secondary-emphasis">
+                <strong>{{key}}</strong>
+    <span class="vr mx-2"></span>
+    {{val|safe}}
+  </span>
+                {% else %}
+                {{val|safe}}
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
 
         {% if "Utility_Progress" in object.keys%}
-        <tr>
-            <td colspan="7">
-                <div class="progress" role="progressbar" aria-label="Basic example"
-                     aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
-                     aria-valuemax="100">
-                    <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%
-                    </div>
-                </div>
-            </td>
-        </tr>
-        {% endif %}
+
+        <div class="row progress mx-auto" role="progressbar"
+             aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
+             aria-valuemax="100">
+            <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%
+            </div>
+        </div>
+    </div>
+    {% endif %}
     {% endfor %}
-    <tr>
-        <form id="quick-add-form">
-            {% csrf_token %}
-            {% for field in quick_create_form %}
-            <td>{{ field }}</td>
-            {% endfor %}
-            <td>
-                <button type="submit" class="btn btn-primary">Create</button>
-            </td>
-        </form>
-    </tr>
 
-</table>
-
+    <form id="quick-add-form" class="row mx-auto p-2">
+        {% csrf_token %}
+        {% for field in quick_create_form %}
+        <div class="input-group col">
+            <span class="input-group-text">{{field.label_tag}}</span>
+            {{ field }}
+        </div>
+        {% endfor %}
+        <div class="col">
+            <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+    </form>
+</div>
 {% endblock %}

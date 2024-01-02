@@ -1,19 +1,20 @@
 from collections import OrderedDict
 from datetime import datetime, timezone, timedelta, time
 
+from django.db.models import Q
 from django.forms.models import model_to_dict
 from django.http import HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView, UpdateView, CreateView
+from django.views.generic.edit import DeleteView
 
 from .forms import TaskCRUDForm, TimeEntryCRUDForm, DateForm, QuickCreate
 from .models import Task, TimeEntry
-from django.views.generic.edit import DeleteView
-from django.http import JsonResponse
 
-
+from django.db.models import Case, When, CharField, Value
 class ViewMixIn:
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
@@ -44,26 +45,37 @@ class HomeView(ViewMixIn, ListView):
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
         context = super().get_context_data(**kwargs)
-        initial_show_date = self.request.GET.get('show_date', None)
-        if not initial_show_date:
-            initial_show_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
 
-        context['filter_form'] = DateForm(initial={'show_date': initial_show_date})
+        initial_show_date = datetime.strptime(self.show_date, '%Y-%m-%d')
+        prev_show_date = datetime.strftime(initial_show_date - timedelta(days=1), '%Y-%m-%d')
+        next_show_date = datetime.strftime(initial_show_date + timedelta(days=1), '%Y-%m-%d')
+        today_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
+        context['go_prev_day'] = f'/?show_date={prev_show_date}'
+        context['go_next_day'] = f'/?show_date={next_show_date}'
+        context['go_to_today'] = f'/?show_date={today_date}'
+        context['filter_form'] = DateForm(initial={'show_date': self.show_date})
         context['quick_create_form'] = QuickCreate()
         context['custom_scripts'] = ['static/quick_make.js', 'static/auto_refresh.js']
+        context['title'] = f'Tasks for {self.show_date}'
         return context
 
     def get_filtered_tasks(self):
-        form = DateForm(self.request.GET)
 
-        if form.is_valid():
-            show_date = form.cleaned_data.get('show_date')
+        status_order = [
+            'Not Started',
+            'Paused',
+            'Running',
+            'Completed',
+            'Deferred',
+        ]
+        self.show_date = self.request.GET.get('show_date', datetime.strftime(datetime.now(), '%Y-%m-%d'))
 
-            if show_date:
-                queryset = Task.objects.filter(task_date=show_date)  # Modify as per your model fields
-            else:
-                queryset = Task.objects.filter(
-                    task_date=datetime.strftime(datetime.now(), '%Y-%m-%d'))  # Modify as per your model fields
+        queryset = Task.objects.filter(task_date=self.show_date).annotate(
+            status_order=Case(
+                *[When(status=status, then=Value(order)) for order, status in enumerate(status_order)],
+                output_field=CharField()
+            )
+        ).order_by('status_order')
 
         return queryset
 
@@ -91,16 +103,16 @@ class HomeView(ViewMixIn, ListView):
 
     def get_priority_colour(self, priority):
         if priority == 'Normal':
-            return 'table-default'
+            return 'border-primary-subtle'
         elif priority == 'Urgent':
-            return 'table-danger'
+            return 'border-danger'
         else:
-            return 'table-warning'
+            return 'border-warning'
 
     def get_edit_badge(self, res):
         html_element = f"""
             <span class="badge rounded-pill text-bg-primary fs-4">
-            <a class="badge" aria-current="page" href="/UpdateTask/{res.id}">{res.name}</a></span>
+            <a class="badge text-wrap" aria-current="page" href="/UpdateTask/{res.id}">{res.name}</a></span>
             """
         return html_element
 
@@ -120,7 +132,7 @@ class HomeView(ViewMixIn, ListView):
 
     def get_status_html(self, res):
         if res.status == 'Running':
-            status_html = f"""<div class = "text-center">
+            status_html = f"""<div class="container">
                             <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Task Running...</span>
                             </div>
@@ -128,17 +140,17 @@ class HomeView(ViewMixIn, ListView):
                             </div>
                             """
         elif res.status == 'Completed':
-            status_html = f"""<div class = "text-center">
-                            <i class="bi bi-check-circle-fill" style="font-size: 2rem; color: cornflowerblue;"></i>
+            status_html = f"""<div class="container">
+                            <i class="bi bi-check-circle-fill text-primary" style="font-size: 2rem;"></i>
                             <p class="text-break">{res.status}</p>
                             </div>"""
         elif res.status == 'Deferred':
-            status_html = f"""<div class = "text-center">
-                            <i class="bi bi-bookmark-dash-fill" style="font-size: 2rem; color: cornflowerblue;"></i>
+            status_html = f"""<div class="container">
+                            <i class="bi bi-bookmark-dash-fill text-primary" style="font-size: 2rem;"></i>
                             <p class="text-break">{res.status}</p>
                             </div>"""
         else:
-            status_html = f"""<div class = "text-center">
+            status_html = f"""<div class="container">
                             <div class="spinner-grow text-primary" style="animation-duration: 7s;" role="status">
                             <span class="visually-hidden">Task Running...</span>
                             </div>
@@ -148,13 +160,13 @@ class HomeView(ViewMixIn, ListView):
         return status_html
 
     def get_controls(self, id, status):
-        actions_dict = [('play','Running','play-circle'), ('pause', 'Paused', 'pause-circle'),
+        actions_dict = [('play', 'Running', 'play-circle'), ('pause', 'Paused', 'pause-circle'),
                         ('next', 'Deferred', 'fast-forward-circle'), ('completed', 'Completed', 'award')]
         html_section = ""
-        for action,state,icon in actions_dict:
-            disable_str = ' disabled aria-disabled="true"' if status==state else ''
-            color = '  color: grey;' if status==state else ''
-            html_section+=f"""
+        for action, state, icon in actions_dict:
+            disable_str = ' disabled aria-disabled="true"' if status == state else ''
+            color = '  color: grey;' if status == state else ''
+            html_section += f"""
             <a class="btn btn-primary{disable_str}" role="button" href="action/{action}/{id}" >
              <i class="bi bi-{icon}" style="font-size: 3rem;{color}"></i></a>
             """
@@ -273,7 +285,7 @@ class Actions(View):
         :return:
         """
         current_task = Task.objects.get(pk=id)
-        other_tasks = Task.objects.filter(id=id, status='Running')
+        other_tasks = Task.objects.filter(~Q(id=id), status='Running')
         _now = datetime.now(timezone.utc)
         if other_tasks.count() > 1:
             self.request.session['updates'].append(('error', f'More than 1 running task found, closing others!'))
@@ -359,9 +371,9 @@ def quick_create_task(request):
         initial_show_date = datetime.now(timezone.utc)
     task1 = Task.objects.create(
         task_date=initial_show_date.date(),
-        start=request.POST.get('proposed_time', datetime.now(timezone.utc).time()),
+        start=request.POST.get('proposed_start', datetime.now(timezone.utc).time()),
         name=request.POST.get('name', datetime.now(timezone.utc).time()),
-        assigned_time=request.POST.get('assign_time', time(minute=20)),
+        assigned_time=request.POST.get('assigned_time', time(minute=20)),
         priority=request.POST.get('priority_choice', 'Normal'),
         task_notes=request.POST.get('notes', 'quick-created'),
         status='Not Started')
