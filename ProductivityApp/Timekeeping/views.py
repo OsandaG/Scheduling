@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time
 
 from django.forms.models import model_to_dict
 from django.http import HttpResponse
@@ -8,22 +8,21 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView, UpdateView, CreateView
 
-from .forms import TaskCRUDForm, TimeEntryCRUDForm, DateForm
+from .forms import TaskCRUDForm, TimeEntryCRUDForm, DateForm, QuickCreate
 from .models import Task, TimeEntry
 from django.views.generic.edit import DeleteView
+from django.http import JsonResponse
 
 
 class ViewMixIn:
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
         context = super().get_context_data(**kwargs)
-        updates = self.request.session.pop('updates', None)
-        if updates:
-            context['updates'] = updates
-
+        context['updates'] = self.request.session.pop('updates', None)
         # Add additional variables to the context
         context['title'] = 'Task List'
         context['nav_bar'] = self.url_list()
+        context['custom_scripts'] = list()
 
         return context
 
@@ -45,11 +44,13 @@ class HomeView(ViewMixIn, ListView):
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
         context = super().get_context_data(**kwargs)
-        initial_show_date = self.request.GET.get('show_date',None)
+        initial_show_date = self.request.GET.get('show_date', None)
         if not initial_show_date:
             initial_show_date = datetime.strftime(datetime.now(), '%Y-%m-%d')
 
         context['filter_form'] = DateForm(initial={'show_date': initial_show_date})
+        context['quick_create_form'] = QuickCreate()
+        context['custom_scripts'] = ['static/quick_make.js', 'static/auto_refresh.js']
         return context
 
     def get_filtered_tasks(self):
@@ -61,7 +62,8 @@ class HomeView(ViewMixIn, ListView):
             if show_date:
                 queryset = Task.objects.filter(task_date=show_date)  # Modify as per your model fields
             else:
-                queryset = Task.objects.filter(task_date=datetime.strftime(datetime.now(), '%Y-%m-%d'))  # Modify as per your model fields
+                queryset = Task.objects.filter(
+                    task_date=datetime.strftime(datetime.now(), '%Y-%m-%d'))  # Modify as per your model fields
 
         return queryset
 
@@ -80,7 +82,7 @@ class HomeView(ViewMixIn, ListView):
                 'Used Time': f'{time_used // 60}M {int(time_used) % 60}S',
                 'Task Notes': self.concat_notes(res),
                 'Status': self.get_status_html(res),
-                'Controls': self.get_controls(res.id),
+                'Controls': self.get_controls(res.id, res.status),
                 'Utility_Progress': self.get_progress(res.status, time_used, assigned_seconds),
                 'Utility_Priority': self.get_priority_colour(res.priority)
             }
@@ -103,10 +105,7 @@ class HomeView(ViewMixIn, ListView):
         return html_element
 
     def get_progress(self, status, time_used, assigned_seconds):
-        if status == 'Completed':
-            return 100
-        else:
-            return int(100 * time_used / assigned_seconds)
+        return int(100 * time_used / assigned_seconds)
 
     def get_used_time(self, res):
         time_entries = TimeEntry.objects.filter(task__id=res.id)
@@ -133,9 +132,9 @@ class HomeView(ViewMixIn, ListView):
                             <i class="bi bi-check-circle-fill" style="font-size: 2rem; color: cornflowerblue;"></i>
                             <p class="text-break">{res.status}</p>
                             </div>"""
-        elif res.status == 'Not Started':
+        elif res.status == 'Deferred':
             status_html = f"""<div class = "text-center">
-                            <i class="bi bi-circle" style="font-size: 2rem; color: cornflowerblue;"></i>
+                            <i class="bi bi-bookmark-dash-fill" style="font-size: 2rem; color: cornflowerblue;"></i>
                             <p class="text-break">{res.status}</p>
                             </div>"""
         else:
@@ -148,13 +147,19 @@ class HomeView(ViewMixIn, ListView):
                             """
         return status_html
 
-    def get_controls(self, id):
-        return f"""
-            <a href="action/play/{id}" ><i class="bi bi-play-circle" style="font-size: 3rem;" aria-disabled="true"></i></a>
-            <a href="action/pause/{id}"><i class="bi bi-pause-circle" style="font-size: 3rem; color: cornflowerblue;"></i></a>
-            <a href="action/next/{id}"><i class="bi bi-fast-forward-circle" style="font-size: 3rem; color: cornflowerblue;"></i></a>
-            <a href="action/completed/{id}"><i class="bi bi-award" style="font-size: 3rem; color: cornflowerblue;"></i></a>
+    def get_controls(self, id, status):
+        actions_dict = [('play','Running','play-circle'), ('pause', 'Paused', 'pause-circle'),
+                        ('next', 'Deferred', 'fast-forward-circle'), ('completed', 'Completed', 'award')]
+        html_section = ""
+        for action,state,icon in actions_dict:
+            disable_str = ' disabled aria-disabled="true"' if status==state else ''
+            color = '  color: grey;' if status==state else ''
+            html_section+=f"""
+            <a class="btn btn-primary{disable_str}" role="button" href="action/{action}/{id}" >
+             <i class="bi bi-{icon}" style="font-size: 3rem;{color}"></i></a>
             """
+
+        return html_section
 
     def concat_notes(self, res):
         notes = res.task_notes
@@ -163,17 +168,14 @@ class HomeView(ViewMixIn, ListView):
             {notes[:min(len(notes), 200)]}</div>
             """
 
-def reset(request):
-    Task.objects.all().delete()
-    TimeEntry.objects.all().delete()
-    return HttpResponse("All Deleted")
 
-class TaskDeleteView(ViewMixIn,DeleteView):
+class TaskDeleteView(ViewMixIn, DeleteView):
     model = Task
     success_url = reverse_lazy("List Tasks")
     template_name = 'check_delete.html'
 
-class TimeEntryDeleteView(ViewMixIn,DeleteView):
+
+class TimeEntryDeleteView(ViewMixIn, DeleteView):
     model = TimeEntry
     success_url = reverse_lazy("List Time Entries")
     template_name = 'check_delete.html'
@@ -198,6 +200,7 @@ class TaskListView(ViewMixIn, ListView):
             object_list.append(res_dict)
         return object_list
 
+
 class TimeEntryListView(ViewMixIn, ListView):
     model = TimeEntry
     template_name = 'generic_list.html'
@@ -210,36 +213,36 @@ class TimeEntryListView(ViewMixIn, ListView):
             <span class="badge rounded-pill text-bg-primary fs-4">
             <a class="badge" aria-current="page" href="/UpdateTimeEntry/{res.id}">{res.__str__()}</a></span>
             """
-            res_dict['Edit'] = f"""
+            res_dict['Delete'] = f"""
              <span class="badge rounded-pill text-bg-primary fs-4">
-             <a class="badge" aria-current="page" href="/UpdateTimeEntry/{res.id}">{res.__str__()}</a></span>
+             <a class="badge" aria-current="page" href="/DeleteTimeEntry/{res.id}">{res.__str__()}</a></span>
              """
             object_list.append(res_dict)
         return object_list
 
 
-class TaskUpdateView(ViewMixIn,UpdateView):
+class TaskUpdateView(ViewMixIn, UpdateView):
     model = Task
     form_class = TaskCRUDForm
     template_name = 'generic_create_update.html'
     success_url = reverse_lazy('List Tasks')
 
 
-class TimeEntryUpdateView(ViewMixIn,UpdateView):
+class TimeEntryUpdateView(ViewMixIn, UpdateView):
     model = TimeEntry
     form_class = TimeEntryCRUDForm
     template_name = 'generic_create_update.html'
     success_url = reverse_lazy('List Time Entries')
 
 
-class TaskCreateView(ViewMixIn,CreateView):
+class TaskCreateView(ViewMixIn, CreateView):
     model = Task
     form_class = TaskCRUDForm
     template_name = 'generic_create_update.html'
     success_url = reverse_lazy('List Tasks')
 
 
-class TimeEntryCreateView(ViewMixIn,CreateView):
+class TimeEntryCreateView(ViewMixIn, CreateView):
     model = TimeEntry
     form_class = TimeEntryCRUDForm
     template_name = 'generic_create_update.html'
@@ -313,9 +316,19 @@ class Actions(View):
             self.request.session['updates'].append(('error', f'Too many open time entries for {current_task.name}'))
         for time_entry in time_entries:
             time_entry.close_entry(_now)
-        tomorrow = _now + timedelta(days=1)
-        current_task.task_date = tomorrow.date()
+        current_task.status = 'Deferred'
         current_task.save()
+        tomorrow = _now + timedelta(days=1)
+
+        new_task = Task.objects.create(
+            task_date=tomorrow.date(),
+            start=current_task.start,
+            name=current_task.name,
+            assigned_time=current_task.assigned_time,
+            priority=current_task.priority,
+            task_notes=current_task.task_notes,
+            status='Not Started')
+        new_task.save()
         self.request.session['updates'].append(('info', f"{current_task.name} has been moved to tomorrow."))
 
     def completed(self, id):
@@ -327,7 +340,35 @@ class Actions(View):
         for time_entry in time_entries:
             time_entry.close_entry(_now)
         current_task.status = 'Completed'
-        tomorrow = _now + timedelta(days=1)
-        current_task.task_date = tomorrow.date()
         current_task.save()
         self.request.session['updates'].append(('info', f"{current_task.name} has been marked as complete."))
+
+
+def reset(request):
+    Task.objects.all().delete()
+    TimeEntry.objects.all().delete()
+    return HttpResponse("All Deleted")
+
+
+def quick_create_task(request):
+    initial_show_date = request.POST.get('show_date', None)
+    if initial_show_date:
+        initial_show_date = datetime.strptime(initial_show_date, '%Y-%m-%d')
+        initial_show_date.replace(tzinfo=timezone.utc)
+    else:
+        initial_show_date = datetime.now(timezone.utc)
+    task1 = Task.objects.create(
+        task_date=initial_show_date.date(),
+        start=request.POST.get('proposed_time', datetime.now(timezone.utc).time()),
+        name=request.POST.get('name', datetime.now(timezone.utc).time()),
+        assigned_time=request.POST.get('assign_time', time(minute=20)),
+        priority=request.POST.get('priority_choice', 'Normal'),
+        task_notes=request.POST.get('notes', 'quick-created'),
+        status='Not Started')
+    task1.save()
+
+    data = {
+        'message': 'Success!',
+        'status': 'success',
+    }
+    return JsonResponse(data)

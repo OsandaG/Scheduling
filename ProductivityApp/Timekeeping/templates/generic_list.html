@@ -10,24 +10,13 @@
         {% endfor %}
     </tr>
     {% for object in object_list %}
-    <tr class = "{{ object.Utility_Priority }}">
+    <tr>
         {% for key,val in object.items %}
         {% if "Utility_" not in key %}
         <td>{{val|safe}}</td>
         {% endif %}
         {% endfor %}
     </tr>
-
-     {% if "Utility_Progress" not in key%}
-    <tr>
-        <td colspan="7">
-            <div class="progress" role="progressbar" aria-label="Basic example" aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
-                 aria-valuemax="100">
-                <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%</div>
-            </div>
-        </td>
-    </tr>
-    {% endif %}
     {% endfor %}
 </table>
 

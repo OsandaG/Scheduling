@@ -2,39 +2,32 @@
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 
-<form method="get" class="row row-cols-lg-auto g-3 align-items-center" action="">
-  {% csrf_token %}
-
-  {% for field in filter_form %}
-    <div class="form-group">
-      <label class="col-sm-2 col-form-label">{{ field.label_tag }}</label>
-      {{ field }}
-      {% if field.help_text %}
-        <small class="form-text text-muted">{{ field.help_text }}</small>
-      {% endif %}
-      {% if field.errors %}
-        <div class="text-danger">
-          {% for error in field.errors %}
-            {{ error }}
-          {% endfor %}
-        </div>
-      {% endif %}
+<form method="get" class="row mx-auto p-2" action="">
+    {% csrf_token %}
+    <div class="input-group">
+    <span class="input-group-text">Date</span>
+    {{ filter_form.show_date }}
+    {% if filter_form.show_date.errors %}
+    <div class="text-danger">
+        {% for error in filter_form.show_date.errors %}
+        {{ error }}
+        {% endfor %}
     </div>
-  {% endfor %}
-
-  <button type="submit" class="btn btn-primary">Submit</button>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Submit</button>
+</div>
 </form>
 
 <table class="table table-striped">
     <tr>
         {% for obj in object_list.0.keys %}
-         {% if "Utility_" not in obj %}
+        {% if "Utility_" not in obj %}
         <th>{{obj}}</th>
         {% endif %}
         {% endfor %}
     </tr>
     {% for object in object_list %}
-    <tr class = "{{ object.Utility_Priority }}">
+    <tr class="{{ object.Utility_Priority }}">
         {% for key,val in object.items %}
         {% if "Utility_" not in key %}
         <td>{{val|safe}}</td>
@@ -42,17 +35,31 @@
         {% endfor %}
     </tr>
 
-     {% if "Utility_Progress" not in key%}
-    <tr>
-        <td colspan="7">
-            <div class="progress" role="progressbar" aria-label="Basic example" aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
-                 aria-valuemax="100">
-                <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%</div>
-            </div>
-        </td>
-    </tr>
-    {% endif %}
+        {% if "Utility_Progress" in object.keys%}
+        <tr>
+            <td colspan="7">
+                <div class="progress" role="progressbar" aria-label="Basic example"
+                     aria-valuenow="{{ object.Utility_Progress }}" aria-valuemin="0"
+                     aria-valuemax="100">
+                    <div class="progress-bar" style="width: {{ object.Utility_Progress }}%">{{ object.Utility_Progress }}%
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endif %}
     {% endfor %}
+    <tr>
+        <form id="quick-add-form">
+            {% csrf_token %}
+            {% for field in quick_create_form %}
+            <td>{{ field }}</td>
+            {% endfor %}
+            <td>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </td>
+        </form>
+    </tr>
+
 </table>
 
 {% endblock %}

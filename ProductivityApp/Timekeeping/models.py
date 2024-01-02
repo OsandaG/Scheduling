@@ -43,8 +43,9 @@ class TimeEntry(models.Model):
     start_time = models.DateTimeField(verbose_name="Started Time", blank=True, null=True)
     end_time = models.DateTimeField(verbose_name="End Time", blank=True, null=True)
     duration = models.BigIntegerField(verbose_name="Duration", blank=True, null=True)
+
     def __str__(self):
-        return f"{self.task.name}-{self.start_time}"
+        return f"{self.id}-{self.start_time}"
 
     def close_entry(self, _now=None):
         if not _now:

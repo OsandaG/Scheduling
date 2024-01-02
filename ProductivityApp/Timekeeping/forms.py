@@ -1,6 +1,6 @@
 from django import forms
-from django.forms.widgets import DateInput
-
+from django.forms.widgets import DateInput, TimeInput, Select
+from datetime import datetime
 from .models import Task, TimeEntry  # Import your model
 
 
@@ -45,3 +45,13 @@ class DateForm(forms.Form):
         widget=DateInput(attrs={'type': 'date'}),  # Use the DateInput widget
         required=False  # Add this if the field is optional
     )
+
+
+class QuickCreate(forms.Form):
+    name = forms.CharField(required=False)
+    proposed_time = forms.TimeField(widget=TimeInput(attrs={'type': 'time'}), required=False,
+                                    initial=datetime.strftime(datetime.now(), '%H:%M'))
+    assign_time = forms.TimeField(widget=TimeInput(attrs={'type': 'time'}), required=False, initial='00:20')
+    choices = (('Urgent', 'Urgent'), ('Normal', 'Normal'), ('Low', 'Low'))
+    priority_choice = forms.ChoiceField(choices=choices, required=False, initial='Normal')
+    notes = forms.CharField(required=False)
