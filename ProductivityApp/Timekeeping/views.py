@@ -384,3 +384,4 @@ def quick_create_task(request):
         'status': 'success',
     }
     return JsonResponse(data)
+
