@@ -19,7 +19,7 @@ $(document).ready(function () {
         // Send an AJAX POST request to create the new entry
         $.ajax({
             type: 'POST',
-            url: '/quick_create_task', // Replace with your actual URL
+            url: 'general_actions/quick_create_task', // Replace with your actual URL
             data: formData,
             processData: false, // Prevent jQuery from processing the data
             contentType: false, // Prevent jQuery from setting content type

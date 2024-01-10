@@ -12,8 +12,6 @@ urlpatterns = [
     path("DeleteTimeEntry/<int:pk>/", views.TimeEntryDeleteView.as_view(), name="Delete Time Entry"),
     path("CreateTask", views.TaskCreateView.as_view(), name="Create Task"),
     path("CreateTimeEntry", views.TimeEntryCreateView.as_view(), name="Create Time Entry"),
-    path("action/<action>/<id>", views.Actions.as_view(), name="actions"),
-    path("reset", views.reset, name="reset"),
-    path("quick_create_task", views.quick_create_task, name="quick_create_task"),
-
+    path("action/<action>/<id>", views.TaskActions.as_view(), name="actions"),
+    path("general_actions/<action>", views.GeneralActions.as_view(), name="general_tasks")
 ]

@@ -3,9 +3,8 @@ from datetime import datetime, timezone, timedelta, time
 
 from django.db.models import Q
 from django.forms.models import model_to_dict
-from django.http import HttpResponse
-from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView, UpdateView, CreateView
@@ -15,6 +14,8 @@ from .forms import TaskCRUDForm, TimeEntryCRUDForm, DateForm, QuickCreate
 from .models import Task, TimeEntry
 
 from django.db.models import Case, When, CharField, Value
+
+
 class ViewMixIn:
     def get_context_data(self, **kwargs):
         # Call the superclass method to get the default context data
@@ -261,7 +262,7 @@ class TimeEntryCreateView(ViewMixIn, CreateView):
     success_url = reverse_lazy('List Time Entries')
 
 
-class Actions(View):
+class TaskActions(View):
     def get(self, request, action, id, *args, **kwargs):
         self.request = request
         self.request.session['updates'] = list()
@@ -356,32 +357,50 @@ class Actions(View):
         self.request.session['updates'].append(('info', f"{current_task.name} has been marked as complete."))
 
 
-def reset(request):
-    Task.objects.all().delete()
-    TimeEntry.objects.all().delete()
-    return HttpResponse("All Deleted")
+class GeneralActions(View):
+    def get(self, request, action, *args, **kwargs):
+        if action == 'Reset':
+            self.reset()
+        elif action == 'quick_create_task':
+            self.quick_create_task()
+        elif action == 'get_back_log':
+            self.get_back_log()
 
+    def reset(self):
+        Task.objects.all().delete()
+        TimeEntry.objects.all().delete()
+        return HttpResponse("All Deleted")
 
-def quick_create_task(request):
-    initial_show_date = request.POST.get('show_date', None)
-    if initial_show_date:
-        initial_show_date = datetime.strptime(initial_show_date, '%Y-%m-%d')
-        initial_show_date.replace(tzinfo=timezone.utc)
-    else:
-        initial_show_date = datetime.now(timezone.utc)
-    task1 = Task.objects.create(
-        task_date=initial_show_date.date(),
-        start=request.POST.get('proposed_start', datetime.now(timezone.utc).time()),
-        name=request.POST.get('name', datetime.now(timezone.utc).time()),
-        assigned_time=request.POST.get('assigned_time', time(minute=20)),
-        priority=request.POST.get('priority_choice', 'Normal'),
-        task_notes=request.POST.get('notes', 'quick-created'),
-        status='Not Started')
-    task1.save()
+    def quick_create_task(self):
+        initial_show_date = self.request.POST.get('show_date', None)
+        if initial_show_date:
+            initial_show_date = datetime.strptime(initial_show_date, '%Y-%m-%d')
+            initial_show_date.replace(tzinfo=timezone.utc)
+        else:
+            initial_show_date = datetime.now(timezone.utc)
+        task1 = Task.objects.create(
+            task_date=initial_show_date.date(),
+            start=self.request.POST.get('proposed_start', datetime.now(timezone.utc).time()),
+            name=self.request.POST.get('name', datetime.now(timezone.utc).time()),
+            assigned_time=self.request.POST.get('assigned_time', time(minute=20)),
+            priority=self.request.POST.get('priority_choice', 'Normal'),
+            task_notes=self.request.POST.get('notes', 'quick-created'),
+            status='Not Started')
+        task1.save()
 
-    data = {
-        'message': 'Success!',
-        'status': 'success',
-    }
-    return JsonResponse(data)
+        data = {
+            'message': 'Success!',
+            'status': 'success',
+        }
+        return JsonResponse(data)
 
+    def get_back_log(self):
+        context = dict()
+        today = datetime.today().replace(minute=0, hour=0, second=0, microsecond=0)
+        pending_tasks = Task.objects.filter(
+            ~Q(status='Completed'),  # ~Q is used to negate the condition
+            task_date__lt=today)  # task_date less than today
+
+        context['object_list'] = [model_to_dict(task) for task in pending_tasks]
+
+        return render(self.request, 'generic_list.html', context)
